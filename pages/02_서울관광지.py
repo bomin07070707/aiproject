@@ -3,590 +3,556 @@ import streamlit as st
 import pandas as pd
 import folium
 from streamlit_folium import st_folium
+from urllib.parse import quote_plus
 
 st.set_page_config(
-    page_title="MBTI 진로 추천 & 서울 관광 지도",
-    page_icon="🧭",
-    layout="wide",
+    page_title="서울 1박 2일 관광 코스",
+    page_icon="🗺️",
+    layout="wide"
 )
 
-# =========================================================
-# 1. MBTI 진로 추천 데이터
-# =========================================================
+st.title("🗺️ 서울 주요 관광지 1박 2일 코스")
+st.caption("매일 09:00~19:00 · 관광지 10곳 · 식사 장소와 호텔 링크 포함")
 
-CAREERS = {
-    "ISTJ": {
-        "nickname": "꼼꼼한 현실주의자",
-        "vibe": "체계와 책임감을 바탕으로 차근차근 목표를 이루는 유형",
-        "jobs": [
-            {"job": "회계·세무 전문가", "major": "회계학과, 세무학과, 경영학과",
-             "fit": "정확성, 책임감, 숫자와 규칙을 꼼꼼하게 다루는 태도",
-             "salary": "약 3,000만~4,500만 원"},
-            {"job": "데이터 분석가", "major": "통계학과, 데이터사이언스학과, 산업공학과",
-             "fit": "논리적 사고, 세부 사항 확인, 꾸준한 문제 해결",
-             "salary": "약 3,500만~5,000만 원"},
-        ],
-    },
-    "ISFJ": {
-        "nickname": "따뜻한 수호자",
-        "vibe": "세심하게 살피고 다른 사람에게 실질적인 도움을 주는 유형",
-        "jobs": [
-            {"job": "간호사", "major": "간호학과",
-             "fit": "배려심, 꼼꼼함, 협력과 책임감",
-             "salary": "약 3,000만~4,200만 원"},
-            {"job": "초등교사", "major": "초등교육과",
-             "fit": "인내심, 공감 능력, 꾸준한 소통",
-             "salary": "약 3,000만~4,500만 원"},
-        ],
-    },
-    "INFJ": {
-        "nickname": "통찰력 있는 조언자",
-        "vibe": "사람과 사회의 의미를 고민하고 더 나은 방향을 찾는 유형",
-        "jobs": [
-            {"job": "상담 전문가", "major": "심리학과, 상담심리학과, 교육학과",
-             "fit": "경청, 공감, 깊이 있는 관찰과 윤리 의식",
-             "salary": "약 2,800만~4,000만 원"},
-            {"job": "콘텐츠 기획자", "major": "국어국문학과, 미디어학과, 문예창작학과",
-             "fit": "통찰력, 글쓰기, 사람들의 관심과 맥락을 이해하는 능력",
-             "salary": "약 3,000만~4,500만 원"},
-        ],
-    },
-    "INTJ": {
-        "nickname": "전략적인 설계자",
-        "vibe": "큰 그림을 그리고 복잡한 문제를 구조적으로 해결하는 유형",
-        "jobs": [
-            {"job": "소프트웨어 개발자", "major": "컴퓨터공학과, 소프트웨어학과",
-             "fit": "논리력, 독립적인 탐구, 지속적인 학습",
-             "salary": "약 3,500만~5,500만 원"},
-            {"job": "전략기획 전문가", "major": "경영학과, 경제학과, 산업공학과",
-             "fit": "분석력, 장기적인 관점, 계획 수립",
-             "salary": "약 3,500만~5,000만 원"},
-        ],
-    },
-    "ISTP": {
-        "nickname": "실용적인 해결사",
-        "vibe": "직접 탐구하고 실험하며 작동하는 해결책을 찾는 유형",
-        "jobs": [
-            {"job": "기계·자동차 엔지니어", "major": "기계공학과, 자동차공학과",
-             "fit": "원리 이해, 실습 선호, 문제 해결 능력",
-             "salary": "약 3,300만~4,800만 원"},
-            {"job": "정보보안 전문가", "major": "정보보호학과, 컴퓨터공학과",
-             "fit": "분석력, 집중력, 기술을 직접 시험하는 태도",
-             "salary": "약 3,500만~5,000만 원"},
-        ],
-    },
-    "ISFP": {
-        "nickname": "감각적인 창작자",
-        "vibe": "자신만의 감각을 살리고 주변의 분위기를 섬세하게 느끼는 유형",
-        "jobs": [
-            {"job": "시각 디자이너", "major": "시각디자인학과, 산업디자인학과",
-             "fit": "미적 감각, 관찰력, 사용자 입장에서 생각하는 태도",
-             "salary": "약 2,800만~4,200만 원"},
-            {"job": "사진·영상 제작자", "major": "영상학과, 사진학과, 미디어학과",
-             "fit": "표현력, 감각, 현장을 관찰하는 능력",
-             "salary": "약 2,700만~4,000만 원"},
-        ],
-    },
-    "INFP": {
-        "nickname": "상상력 풍부한 이야기꾼",
-        "vibe": "가치와 가능성을 중요하게 생각하고 창의적으로 표현하는 유형",
-        "jobs": [
-            {"job": "작가·에디터", "major": "문예창작학과, 국어국문학과, 미디어학과",
-             "fit": "상상력, 언어 감각, 깊이 있는 주제 탐구",
-             "salary": "약 2,700만~4,200만 원"},
-            {"job": "UX 콘텐츠 디자이너", "major": "디자인학과, HCI, 미디어학과",
-             "fit": "공감 능력, 창의성, 사용자 경험을 이해하는 태도",
-             "salary": "약 3,000만~4,500만 원"},
-        ],
-    },
-    "INTP": {
-        "nickname": "호기심 많은 탐구자",
-        "vibe": "질문을 던지고 원리를 파고들며 새로운 아이디어를 만드는 유형",
-        "jobs": [
-            {"job": "연구원", "major": "관심 분야의 자연과학·공학 계열 학과",
-             "fit": "탐구심, 논리력, 가설을 검증하는 태도",
-             "salary": "약 3,000만~4,800만 원"},
-            {"job": "AI·머신러닝 엔지니어", "major": "컴퓨터공학과, 인공지능학과, 수학과",
-             "fit": "수학적 사고, 실험 정신, 새로운 기술 학습",
-             "salary": "약 4,000만~6,000만 원"},
-        ],
-    },
-    "ESTP": {
-        "nickname": "에너지 넘치는 실행가",
-        "vibe": "현장에서 빠르게 판단하고 사람들과 직접 부딪히며 배우는 유형",
-        "jobs": [
-            {"job": "마케팅 기획자", "major": "경영학과, 광고홍보학과",
-             "fit": "순발력, 소통 능력, 시장 반응을 읽는 감각",
-             "salary": "약 3,000만~4,500만 원"},
-            {"job": "이벤트·공연 기획자", "major": "문화콘텐츠학과, 공연예술학과",
-             "fit": "현장 대응력, 추진력, 협업 능력",
-             "salary": "약 2,800만~4,200만 원"},
-        ],
-    },
-    "ESFP": {
-        "nickname": "즐거움을 나누는 분위기 메이커",
-        "vibe": "사람들과 교류하고 생생한 경험을 만들어 가는 유형",
-        "jobs": [
-            {"job": "호텔·관광 서비스 기획자", "major": "호텔관광학과, 관광경영학과",
-             "fit": "친화력, 서비스 감각, 다양한 사람을 이해하는 태도",
-             "salary": "약 2,800만~4,200만 원"},
-            {"job": "방송·미디어 진행자", "major": "방송영상학과, 언론정보학과",
-             "fit": "표현력, 순발력, 대중과 소통하는 능력",
-             "salary": "약 2,800만~4,500만 원"},
-        ],
-    },
-    "ENFP": {
-        "nickname": "아이디어가 샘솟는 활동가",
-        "vibe": "새로운 가능성을 발견하고 사람들과 아이디어를 나누는 유형",
-        "jobs": [
-            {"job": "브랜드 마케터", "major": "경영학과, 광고홍보학과, 미디어학과",
-             "fit": "창의성, 소통 능력, 트렌드에 대한 호기심",
-             "salary": "약 3,000만~4,800만 원"},
-            {"job": "교육 콘텐츠 기획자", "major": "교육학과, 교육공학과, 콘텐츠학과",
-             "fit": "아이디어 발상, 공감, 복잡한 내용을 쉽게 전달하는 능력",
-             "salary": "약 3,000만~4,500만 원"},
-        ],
-    },
-    "ENTP": {
-        "nickname": "재치 있는 발명가",
-        "vibe": "기존 방식에 질문을 던지고 새로운 접근법을 시도하는 유형",
-        "jobs": [
-            {"job": "창업·사업개발 기획자", "major": "경영학과, 경제학과, 창업학과",
-             "fit": "아이디어 발상, 설득력, 기회를 발견하는 능력",
-             "salary": "약 3,200만~5,000만 원"},
-            {"job": "서비스 기획자", "major": "산업공학과, 경영정보학과, 컴퓨터공학과",
-             "fit": "문제 정의, 논리적 토론, 다양한 의견 조율",
-             "salary": "약 3,300만~5,000만 원"},
-        ],
-    },
-    "ESTJ": {
-        "nickname": "믿음직한 관리자",
-        "vibe": "목표와 역할을 명확히 하고 일을 효율적으로 이끄는 유형",
-        "jobs": [
-            {"job": "프로젝트 매니저", "major": "산업공학과, 경영학과",
-             "fit": "조직력, 책임감, 일정과 자원 관리",
-             "salary": "약 3,500만~5,200만 원"},
-            {"job": "물류·운영 관리자", "major": "물류학과, 산업공학과, 경영학과",
-             "fit": "실행력, 체계적인 관리, 협업과 의사소통",
-             "salary": "약 3,200만~4,800만 원"},
-        ],
-    },
-    "ESFJ": {
-        "nickname": "사람을 연결하는 협력가",
-        "vibe": "주변 사람들과 조화를 이루고 함께 성과를 만드는 유형",
-        "jobs": [
-            {"job": "인사·교육 담당자", "major": "경영학과, 교육학과, 심리학과",
-             "fit": "공감, 조율 능력, 구성원의 성장을 돕는 태도",
-             "salary": "약 3,000만~4,500만 원"},
-            {"job": "공공·복지 분야 기획자", "major": "사회복지학과, 행정학과",
-             "fit": "협력, 책임감, 사람과 제도를 연결하는 능력",
-             "salary": "약 2,800만~4,200만 원"},
-        ],
-    },
-    "ENFJ": {
-        "nickname": "성장을 이끄는 리더",
-        "vibe": "사람의 가능성을 발견하고 공동의 목표를 향해 이끄는 유형",
-        "jobs": [
-            {"job": "교육·진로 컨설턴트", "major": "교육학과, 상담학과, 심리학과",
-             "fit": "경청, 동기 부여, 설명과 소통 능력",
-             "salary": "약 2,900만~4,500만 원"},
-            {"job": "홍보·커뮤니케이션 전문가", "major": "언론홍보학과, 광고홍보학과",
-             "fit": "공감, 설득력, 관계 형성과 메시지 전달",
-             "salary": "약 3,000만~4,600만 원"},
-        ],
-    },
-    "ENTJ": {
-        "nickname": "목표 지향적인 지휘자",
-        "vibe": "도전적인 목표를 세우고 전략적으로 실행하는 유형",
-        "jobs": [
-            {"job": "경영 컨설턴트", "major": "경영학과, 경제학과, 산업공학과",
-             "fit": "전략적 사고, 분석력, 의사결정 능력",
-             "salary": "약 3,800만~5,800만 원"},
-            {"job": "제품·사업 책임자", "major": "경영학과, 컴퓨터공학과, 산업공학과",
-             "fit": "목표 설정, 리더십, 여러 분야를 통합하는 능력",
-             "salary": "약 3,800만~5,800만 원"},
-        ],
-    },
-}
+st.info(
+    "동선은 서울 중심부와 동남·서북권을 날짜별로 묶은 추천 예시입니다. "
+    "실제 이동 시간은 교통·대기 상황에 따라 달라질 수 있어요."
+)
 
-# =========================================================
-# 2. 서울 관광지 TOP 10 데이터
-# =========================================================
 
-ATTRACTIONS = [
+# Google Maps 검색 링크 생성
+def map_link(place: str) -> str:
+    return (
+        "https://www.google.com/maps/search/?api=1&query="
+        + quote_plus(place + ", Seoul, South Korea")
+    )
+
+
+# 관광지 데이터
+spots = [
     {
-        "name": "명동",
-        "english": "Myeong-dong",
-        "lat": 37.5636,
-        "lon": 126.9850,
-        "category": "쇼핑·먹거리",
-        "description": "화장품 쇼핑, 길거리 음식, 활기찬 도심 분위기를 즐길 수 있는 대표 관광 지역입니다.",
-        "description_en": "A lively shopping district known for cosmetics, street food and a busy city atmosphere.",
-        "search": "Myeongdong Seoul",
-    },
-    {
-        "name": "N서울타워",
-        "english": "N Seoul Tower",
-        "lat": 37.5512,
-        "lon": 126.9882,
-        "category": "전망·랜드마크",
-        "description": "남산에서 서울의 도심 풍경과 야경을 감상할 수 있습니다.",
-        "description_en": "Enjoy panoramic views of Seoul from Namsan, especially around sunset.",
-        "search": "N Seoul Tower",
-    },
-    {
-        "name": "코엑스·별마당도서관",
-        "english": "COEX & Starfield Library",
-        "lat": 37.5125,
-        "lon": 127.0590,
-        "category": "쇼핑·문화",
-        "description": "대형 쇼핑·전시 공간과 개방형 별마당도서관으로 유명합니다.",
-        "description_en": "A large shopping and exhibition complex featuring Starfield Library.",
-        "search": "COEX Starfield Library Seoul",
-    },
-    {
-        "name": "강남역 일대",
-        "english": "Gangnam Station Area",
-        "lat": 37.4979,
-        "lon": 127.0276,
-        "category": "도심·쇼핑",
-        "description": "현대적인 상점과 음식점, 카페가 모여 있는 서울의 대표 번화가입니다.",
-        "description_en": "A busy modern district filled with shops, restaurants and cafés.",
-        "search": "Gangnam Station Seoul",
-    },
-    {
-        "name": "홍대 거리",
-        "english": "Hongdae",
-        "lat": 37.5563,
-        "lon": 126.9236,
-        "category": "문화·공연",
-        "description": "거리 공연, 개성 있는 상점, 음악과 젊은 문화로 유명합니다.",
-        "description_en": "Known for street performances, independent shops and music.",
-        "search": "Hongdae Street Seoul",
-    },
-    {
-        "name": "동대문디자인플라자(DDP)",
-        "english": "Dongdaemun Design Plaza",
-        "lat": 37.5669,
-        "lon": 127.0095,
-        "category": "건축·전시",
-        "description": "독특한 곡선형 건축물과 디자인 전시, 야간 경관을 즐길 수 있습니다.",
-        "description_en": "A striking architectural landmark hosting design exhibitions and events.",
-        "search": "Dongdaemun Design Plaza Seoul",
-    },
-    {
+        "no": 1, "day": "1일차",
         "name": "경복궁",
-        "english": "Gyeongbokgung Palace",
-        "lat": 37.5796,
-        "lon": 126.9770,
-        "category": "역사·전통문화",
-        "description": "조선 왕조의 대표 궁궐로 한국의 전통 건축과 역사를 경험할 수 있습니다.",
-        "description_en": "Seoul's best-known royal palace, offering a glimpse into Korean history.",
-        "search": "Gyeongbokgung Palace Seoul",
+        "lat": 37.5796, "lon": 126.9770,
+        "desc": "조선 왕궁과 근정전, 경회루 관람"
     },
     {
+        "no": 2, "day": "1일차",
         "name": "북촌한옥마을",
-        "english": "Bukchon Hanok Village",
-        "lat": 37.5826,
-        "lon": 126.9830,
-        "category": "전통·거리",
-        "description": "전통 한옥이 모여 있는 지역입니다. 실제 주민이 거주하므로 조용히 관람해 주세요.",
-        "description_en": "A traditional hanok neighborhood. Please keep noise low because people live here.",
-        "search": "Bukchon Hanok Village Seoul",
+        "lat": 37.5826, "lon": 126.9830,
+        "desc": "전통 한옥 골목 산책"
     },
     {
+        "no": 3, "day": "1일차",
+        "name": "동대문디자인플라자(DDP)",
+        "lat": 37.5671, "lon": 127.0095,
+        "desc": "건축물 외관과 디자인 전시 공간"
+    },
+    {
+        "no": 4, "day": "1일차",
         "name": "광장시장",
-        "english": "Gwangjang Market",
-        "lat": 37.5700,
-        "lon": 126.9997,
-        "category": "전통시장·음식",
-        "description": "빈대떡, 김밥 등 한국 길거리 음식과 전통시장 분위기를 경험할 수 있습니다.",
-        "description_en": "A traditional market popular for Korean street food and local atmosphere.",
-        "search": "Gwangjang Market Seoul",
+        "lat": 37.5700, "lon": 127.0005,
+        "desc": "전통시장 구경과 간식"
     },
     {
+        "no": 5, "day": "1일차",
+        "name": "명동거리",
+        "lat": 37.5636, "lon": 126.9869,
+        "desc": "쇼핑 거리와 도심 분위기"
+    },
+    {
+        "no": 6, "day": "1일차",
+        "name": "N서울타워",
+        "lat": 37.5512, "lon": 126.9882,
+        "desc": "남산 전망 감상"
+    },
+    {
+        "no": 7, "day": "2일차",
         "name": "서울숲",
-        "english": "Seoul Forest",
-        "lat": 37.5444,
-        "lon": 127.0374,
-        "category": "공원·자연",
-        "description": "도심 속 산책과 휴식을 즐길 수 있는 넓은 공원입니다.",
-        "description_en": "A spacious urban park for walking and relaxing, close to Seongsu-dong.",
-        "search": "Seoul Forest",
+        "lat": 37.5444, "lon": 127.0374,
+        "desc": "도심 공원 산책"
+    },
+    {
+        "no": 8, "day": "2일차",
+        "name": "코엑스·별마당도서관",
+        "lat": 37.5129, "lon": 127.0591,
+        "desc": "실내 복합문화공간과 별마당도서관"
+    },
+    {
+        "no": 9, "day": "2일차",
+        "name": "강남역 일대",
+        "lat": 37.4979, "lon": 127.0276,
+        "desc": "강남 대표 상권과 거리 풍경"
+    },
+    {
+        "no": 10, "day": "2일차",
+        "name": "홍대 걷고싶은거리",
+        "lat": 37.5563, "lon": 126.9236,
+        "desc": "거리 공연·상점·청년 문화"
     },
 ]
 
 
-# =========================================================
-# 3. Folium 지도 생성 함수
-# =========================================================
+# 식당 데이터
+food = [
+    {
+        "name": "애즈라이크(서촌)",
+        "lat": 37.5780, "lon": 126.9724,
+        "kind": "아침",
+        "menu": "브런치·샌드위치·커피",
+        "day": "1일차"
+    },
+    {
+        "name": "인사도담",
+        "lat": 37.5740, "lon": 126.9852,
+        "kind": "점심",
+        "menu": "한식·불고기 등",
+        "day": "1일차"
+    },
+    {
+        "name": "예지식당(명동)",
+        "lat": 37.5642, "lon": 126.9851,
+        "kind": "저녁",
+        "menu": "한식 백반·만두 등",
+        "day": "1일차"
+    },
+    {
+        "name": "어니언 성수",
+        "lat": 37.5447, "lon": 127.0560,
+        "kind": "아침",
+        "menu": "베이커리·커피",
+        "day": "2일차"
+    },
+    {
+        "name": "멘쇼쿠 코엑스점",
+        "lat": 37.5099, "lon": 127.0600,
+        "kind": "점심",
+        "menu": "일식 정식·라멘",
+        "day": "2일차"
+    },
+    {
+        "name": "육지 홍대",
+        "lat": 37.5516, "lon": 126.9228,
+        "kind": "저녁",
+        "menu": "돼지고기 구이",
+        "day": "2일차"
+    },
+]
 
-def make_seoul_map(selected_name=None):
 
-    seoul_map = folium.Map(
-        location=[37.5665, 126.9780],
-        zoom_start=11,
-        tiles="OpenStreetMap",
-        control_scale=True,
-    )
-
-    for index, place in enumerate(ATTRACTIONS, start=1):
-
-        is_selected = place["name"] == selected_name
-
-        popup_html = f"""
-        <div style="width:230px; font-family:Arial,sans-serif;">
-            <h4>{index}. {place['name']}</h4>
-            <b>{place['english']}</b><br>
-            <span>{place['category']}</span>
-            <hr>
-            <p>{place['description']}</p>
-        </div>
-        """
-
-        folium.Marker(
-            location=[place["lat"], place["lon"]],
-            tooltip=f"{index}. {place['name']} ({place['english']})",
-            popup=folium.Popup(popup_html, max_width=300),
-            icon=folium.Icon(
-                color="red" if is_selected else "blue",
-                icon="star" if is_selected else "info-sign",
-                prefix="glyphicon",
-            ),
-        ).add_to(seoul_map)
-
-    return seoul_map
+# 호텔 데이터
+hotels = [
+    {
+        "name": "서머셋 팰리스 서울",
+        "area": "종로·안국",
+        "note": "궁궐·북촌·인사동 중심 일정에 편리한 레지던스형 숙소",
+        "lat": 37.5758, "lon": 126.9815
+    },
+    {
+        "name": "프레이저 플레이스 센트럴 서울",
+        "area": "시청·서대문",
+        "note": "객실 유형이 다양한 레지던스형 숙소",
+        "lat": 37.5627, "lon": 126.9687
+    },
+    {
+        "name": "UH 스위트 센트럴 서울",
+        "area": "시청·무교동",
+        "note": "도심 관광지와 명동 접근성을 고려할 만한 숙소",
+        "lat": 37.5670, "lon": 126.9802
+    },
+]
 
 
-# =========================================================
-# 4. 앱 제목 및 탭
-# =========================================================
+# 날짜별 관광 동선
+day1 = [
+    (s["lat"], s["lon"])
+    for s in spots if s["day"] == "1일차"
+]
 
-st.title("🧭 MBTI 진로 추천 & 서울 관광 지도")
+day2 = [
+    (s["lat"], s["lon"])
+    for s in spots if s["day"] == "2일차"
+]
+
+
+# --------------------------------------------------
+# 1. 전체 지도
+# --------------------------------------------------
+
+st.subheader("1. 서울 관광·식사·호텔 전체 지도")
+
+map_obj = folium.Map(
+    location=[37.557, 126.995],
+    zoom_start=12,
+    control_scale=True,
+    tiles="OpenStreetMap"
+)
+
+
+# 관광지 마커
+for s in spots:
+    color = "blue" if s["day"] == "1일차" else "purple"
+
+    folium.Marker(
+        [s["lat"], s["lon"]],
+        tooltip=f"{s['no']}. {s['name']} ({s['day']})",
+        popup=(
+            f"<b>{s['no']}. {s['name']}</b><br>"
+            f"{s['desc']}<br>"
+            f"<a href='{map_link(s['name'])}' target='_blank'>"
+            "지도에서 자세히 보기</a>"
+        ),
+        icon=folium.Icon(
+            color=color,
+            icon="camera",
+            prefix="fa"
+        ),
+    ).add_to(map_obj)
+
+
+# 날짜별 관광 동선
+folium.PolyLine(
+    day1,
+    color="#2471A3",
+    weight=4,
+    opacity=0.8,
+    tooltip="1일차 관광 동선"
+).add_to(map_obj)
+
+folium.PolyLine(
+    day2,
+    color="#8E44AD",
+    weight=4,
+    opacity=0.8,
+    tooltip="2일차 관광 동선"
+).add_to(map_obj)
+
+
+# 식당 마커
+for f in food:
+    folium.Marker(
+        [f["lat"], f["lon"]],
+        tooltip=f"식당: {f['name']} ({f['day']} {f['kind']})",
+        popup=(
+            f"<b>{f['name']}</b><br>"
+            f"{f['day']} {f['kind']}<br>"
+            f"{f['menu']}<br>"
+            f"<a href='{map_link(f['name'])}' target='_blank'>"
+            "식당 지도·정보</a>"
+        ),
+        icon=folium.Icon(
+            color="orange",
+            icon="cutlery",
+            prefix="fa"
+        ),
+    ).add_to(map_obj)
+
+
+# 호텔 마커
+for h in hotels:
+    folium.Marker(
+        [h["lat"], h["lon"]],
+        tooltip=f"호텔: {h['name']}",
+        popup=(
+            f"<b>{h['name']}</b><br>"
+            f"{h['area']}<br>"
+            f"{h['note']}<br>"
+            f"<a href='{map_link(h['name'])}' target='_blank'>"
+            "호텔 위치·정보</a>"
+        ),
+        icon=folium.Icon(
+            color="green",
+            icon="bed",
+            prefix="fa"
+        ),
+    ).add_to(map_obj)
+
+
+folium.LayerControl().add_to(map_obj)
+
+st_folium(
+    map_obj,
+    height=590,
+    use_container_width=True
+)
 
 st.caption(
-    "나의 성향에 맞는 진로를 살펴보고, "
-    "외국인 관광객에게 인기 있는 서울 명소도 찾아보세요."
-)
-
-career_tab, travel_tab, about_tab = st.tabs(
-    ["🎯 MBTI 진로 추천", "🗺️ 서울 관광 TOP 10", "ℹ️ 안내"]
+    "지도 범례: 파란색 관광지=1일차 / 보라색 관광지=2일차 / "
+    "주황색=식당 / 초록색=호텔. "
+    "선은 관광지 사이의 개략적 연결선이며 실제 대중교통 경로가 아닙니다."
 )
 
 
-# =========================================================
-# 5. MBTI 진로 추천
-# =========================================================
+# --------------------------------------------------
+# 2. 1일차 일정표
+# --------------------------------------------------
 
-with career_tab:
-
-    st.header("나의 MBTI로 진로 탐색하기")
-
-    st.write(
-        "MBTI는 진로를 결정하는 기준이 아니라, "
-        "나의 관심과 강점을 생각해 보는 출발점입니다."
-    )
-
-    mbti = st.selectbox(
-        "나의 MBTI를 선택하세요",
-        list(CAREERS.keys()),
-    )
-
-    profile = CAREERS[mbti]
-
-    st.subheader(f"{mbti} · {profile['nickname']}")
-
-    st.info(profile["vibe"])
-
-    columns = st.columns(2)
-
-    for index, job in enumerate(profile["jobs"]):
-
-        with columns[index]:
-
-            st.markdown(f"### {index + 1}. {job['job']}")
-
-            st.markdown(
-                f"**관련 학과**  \n{job['major']}"
-            )
-
-            st.markdown(
-                f"**잘 발휘할 수 있는 강점**  \n{job['fit']}"
-            )
-
-            st.markdown(
-                f"**연봉 참고 범위**  \n{job['salary']}"
-            )
-
-            st.caption(
-                "참고용 추정 범위이며 실제 연봉과 다를 수 있습니다."
-            )
-
-    st.warning(
-        "MBTI만으로 적합한 직업을 단정할 수는 없습니다. "
-        "흥미, 가치관, 과목 선호도와 경험도 함께 살펴보세요."
-    )
-
-    st.markdown(
-        "[고용24 직업정보](https://www.work24.go.kr/) · "
-        "[커리어넷 진로정보](https://www.career.go.kr/)"
-    )
+day1_rows = [
+    [
+        "09:00–09:35", "아침", "애즈라이크(서촌)",
+        "브런치와 커피로 가볍게 시작",
+        "경복궁역 주변 도보",
+        map_link("애즈라이크 서촌")
+    ],
+    [
+        "09:40–11:10", "관광 1", "경복궁",
+        "근정전·경회루 등 관람",
+        "도보", map_link("경복궁")
+    ],
+    [
+        "11:20–12:05", "관광 2", "북촌한옥마을",
+        "한옥 골목 산책",
+        "도보", map_link("북촌한옥마을")
+    ],
+    [
+        "12:15–13:10", "점심", "인사도담",
+        "불고기 등 한식 메뉴",
+        "도보·대중교통", map_link("인사도담")
+    ],
+    [
+        "13:40–14:35", "관광 3",
+        "동대문디자인플라자(DDP)",
+        "건축물과 전시 공간 둘러보기",
+        "지하철·도보", map_link("동대문디자인플라자")
+    ],
+    [
+        "14:50–15:50", "관광 4", "광장시장",
+        "시장 구경과 간식",
+        "도보", map_link("광장시장")
+    ],
+    [
+        "16:10–17:00", "관광 5", "명동거리",
+        "쇼핑 거리 산책",
+        "지하철·도보", map_link("명동거리")
+    ],
+    [
+        "17:00–17:45", "저녁", "예지식당(명동)",
+        "한식 백반 등 간단한 저녁",
+        "도보", map_link("예지식당 명동")
+    ],
+    [
+        "18:00–19:00", "관광 6", "N서울타워",
+        "남산 전망 감상 후 일정 종료",
+        "케이블카·버스 등", map_link("N서울타워")
+    ],
+]
 
 
-# =========================================================
-# 6. 서울 관광 지도 - Folium
-# =========================================================
+# --------------------------------------------------
+# 3. 2일차 일정표
+# --------------------------------------------------
 
-with travel_tab:
+day2_rows = [
+    [
+        "09:00–09:40", "아침", "어니언 성수",
+        "베이커리와 커피",
+        "성수역 주변 도보", map_link("어니언 성수")
+    ],
+    [
+        "09:45–11:15", "관광 7", "서울숲",
+        "공원 산책과 휴식",
+        "도보", map_link("서울숲")
+    ],
+    [
+        "11:15–12:20", "이동·자유시간",
+        "성수에서 코엑스로 이동",
+        "이동 중 카페·상점은 여유에 따라 선택",
+        "지하철·도보", map_link("서울숲역에서 코엑스")
+    ],
+    [
+        "12:20–13:15", "점심", "멘쇼쿠 코엑스점",
+        "일식 정식·라멘",
+        "코엑스 내 도보", map_link("멘쇼쿠 코엑스점")
+    ],
+    [
+        "13:20–14:35", "관광 8",
+        "코엑스·별마당도서관",
+        "실내 복합문화공간과 도서관",
+        "도보", map_link("별마당도서관")
+    ],
+    [
+        "14:55–15:55", "관광 9", "강남역 일대",
+        "대표 상권과 거리 구경",
+        "지하철·도보", map_link("강남역")
+    ],
+    [
+        "15:55–17:00", "이동·자유시간",
+        "강남에서 홍대로 이동",
+        "교통 상황에 따라 여유시간 조정",
+        "지하철", map_link("홍대입구역")
+    ],
+    [
+        "17:00–18:00", "관광 10",
+        "홍대 걷고싶은거리",
+        "거리 공연과 상점 구경",
+        "도보", map_link("홍대 걷고싶은거리")
+    ],
+    [
+        "18:00–19:00", "저녁", "육지 홍대",
+        "직원이 구워주는 돼지고기 구이",
+        "도보", map_link("육지 홍대")
+    ],
+]
 
-    st.header("외국인 관광객을 위한 서울 관광 명소 TOP 10")
 
-    st.write(
-        "서울의 대표 관광 명소 10곳을 Folium 지도에 표시했습니다. "
-        "마커를 클릭하면 관광지 설명을 볼 수 있습니다."
-    )
+columns = [
+    "시간", "구분", "장소",
+    "일정", "이동", "지도 링크"
+]
 
-    place_names = [
-        f"{index}. {place['name']} ({place['english']})"
-        for index, place in enumerate(ATTRACTIONS, start=1)
+
+# --------------------------------------------------
+# 4. 일정표 화면 출력
+# --------------------------------------------------
+
+st.subheader("2. 1일차 일정표 | 고궁·한옥·도심·남산")
+
+st.dataframe(
+    pd.DataFrame(day1_rows, columns=columns),
+    hide_index=True,
+    use_container_width=True,
+    column_config={
+        "지도 링크": st.column_config.LinkColumn(
+            "지도 링크",
+            display_text="지도 열기"
+        )
+    }
+)
+
+
+st.subheader("3. 2일차 일정표 | 공원·코엑스·강남·홍대")
+
+st.dataframe(
+    pd.DataFrame(day2_rows, columns=columns),
+    hide_index=True,
+    use_container_width=True,
+    column_config={
+        "지도 링크": st.column_config.LinkColumn(
+            "지도 링크",
+            display_text="지도 열기"
+        )
+    }
+)
+
+
+# --------------------------------------------------
+# 5. 식당 추천
+# --------------------------------------------------
+
+st.subheader("4. 동선에 맞춘 식당 추천")
+
+meal_rows = [
+    [
+        "1일차 아침", "애즈라이크(서촌)",
+        "브런치·샌드위치·커피",
+        "경복궁 방문 전 가볍게 먹기 좋은 서촌 권역",
+        map_link("애즈라이크 서촌")
+    ],
+    [
+        "1일차 점심", "인사도담",
+        "한식·불고기 등",
+        "북촌에서 인사동 방향으로 이동하며 들르기 편한 위치",
+        map_link("인사도담")
+    ],
+    [
+        "1일차 저녁", "예지식당(명동)",
+        "한식 백반·만두 등",
+        "명동 산책 후 남산으로 이동하기 전 식사",
+        map_link("예지식당 명동")
+    ],
+    [
+        "2일차 아침", "어니언 성수",
+        "베이커리·커피",
+        "서울숲 산책 전 성수에서 아침",
+        map_link("어니언 성수")
+    ],
+    [
+        "2일차 점심", "멘쇼쿠 코엑스점",
+        "일식 정식·라멘",
+        "별마당도서관 관람 전 코엑스 안에서 식사",
+        map_link("멘쇼쿠 코엑스점")
+    ],
+    [
+        "2일차 저녁", "육지 홍대",
+        "돼지고기 구이",
+        "홍대 거리 구경 후 저녁 식사",
+        map_link("육지 홍대")
+    ],
+]
+
+
+st.dataframe(
+    pd.DataFrame(
+        meal_rows,
+        columns=[
+            "식사", "식당", "추천 메뉴",
+            "동선상 추천 이유", "링크"
+        ]
+    ),
+    hide_index=True,
+    use_container_width=True,
+    column_config={
+        "링크": st.column_config.LinkColumn(
+            "식당 위치·정보",
+            display_text="지도에서 보기"
+        )
+    }
+)
+
+st.caption(
+    "식당 영업시간·휴무·대기시간은 방문일에 다시 확인하세요. "
+    "메뉴와 가격은 매장 사정에 따라 바뀔 수 있습니다."
+)
+
+
+# --------------------------------------------------
+# 6. 호텔 추천
+# --------------------------------------------------
+
+st.subheader("5. 숙소 추천")
+
+hotel_rows = [
+    [
+        h["name"],
+        h["area"],
+        h["note"],
+        map_link(h["name"])
     ]
+    for h in hotels
+]
 
-    selected_label = st.selectbox(
-        "관광지를 선택하면 지도에서 해당 마커가 빨간색으로 표시됩니다.",
-        place_names,
-    )
-
-    selected_index = place_names.index(selected_label)
-
-    selected_place = ATTRACTIONS[selected_index]
-
-    info_col1, info_col2 = st.columns([2, 1])
-
-    with info_col1:
-
-        st.subheader(selected_place["name"])
-
-        st.caption(selected_place["english"])
-
-        st.write(selected_place["description"])
-
-        st.write(selected_place["description_en"])
-
-    with info_col2:
-
-        st.metric("관광지 번호", f"{selected_index + 1} / 10")
-
-        st.caption(selected_place["category"])
-
-        google_map_url = (
-            "https://www.google.com/maps/search/?api=1&query="
-            + selected_place["search"].replace(" ", "+")
+st.dataframe(
+    pd.DataFrame(
+        hotel_rows,
+        columns=["호텔", "권역", "추천 이유", "링크"]
+    ),
+    hide_index=True,
+    use_container_width=True,
+    column_config={
+        "링크": st.column_config.LinkColumn(
+            "호텔 위치·정보",
+            display_text="호텔 정보 보기"
         )
-
-        st.link_button(
-            "Google 지도에서 길찾기",
-            google_map_url,
-        )
-
-    st.divider()
-
-    # Folium 지도 생성
-    seoul_map = make_seoul_map(selected_place["name"])
-
-    # Streamlit 화면에 Folium 지도 출력
-    st_folium(
-        seoul_map,
-        width=None,
-        height=620,
-        returned_objects=[],
-        use_container_width=True,
-        key="seoul_tourism_folium_map",
-    )
-
-    st.caption(
-        "파란색 마커는 추천 관광지, 빨간색 마커는 현재 선택한 관광지입니다. "
-        "마커를 클릭하면 한국어 설명과 영어 이름을 확인할 수 있습니다."
-    )
-
-    st.divider()
-
-    st.subheader("서울 관광지 TOP 10 목록")
-
-    for index, place in enumerate(ATTRACTIONS, start=1):
-
-        with st.expander(
-            f"{index}. {place['name']} · {place['english']}"
-        ):
-
-            st.write(place["description"])
-
-            st.write(place["description_en"])
-
-            st.caption(f"분류: {place['category']}")
-
-            url = (
-                "https://www.google.com/maps/search/?api=1&query="
-                + place["search"].replace(" ", "+")
-            )
-
-            st.link_button(
-                "Google 지도에서 위치 보기",
-                url,
-                key=f"google_map_{index}",
-            )
+    }
+)
 
 
-# =========================================================
-# 7. 안내
-# =========================================================
-
-with about_tab:
-
-    st.header("데이터와 이용 안내")
-
+for h in hotels:
     st.markdown(
-        """
-        ### 관광지 선정 참고 자료
-
-        - 서울시 외국인 방문 동향 및 관광 관련 자료
-        - 서울의 대표 관광 명소
-        - 외국인 관광객이 많이 찾는 쇼핑·문화·역사·자연 관광 지역
-
-        ### 지도 안내
-
-        - 지도는 Folium과 OpenStreetMap 타일을 사용합니다.
-        - 마커를 클릭하면 관광지 설명을 볼 수 있습니다.
-        - 지도 확대·축소와 이동이 가능합니다.
-        - 관광지 좌표는 해당 장소의 대략적인 중심 위치입니다.
-        - 지도 타일을 불러오려면 인터넷 연결이 필요합니다.
-
-        ### 주의 사항
-
-        - TOP 10은 공식 통계 순위가 아닌 여행 추천용 큐레이션입니다.
-        - 운영 시간, 휴무일, 입장료는 방문 전에 확인하세요.
-        - 북촌한옥마을은 주민 거주 지역이므로 정숙하게 관람해 주세요.
-
-        ### 진로 정보
-
-        - 연봉은 직업별 참고용 추정 범위입니다.
-        - 실제 연봉은 경력과 기업에 따라 달라집니다.
-        - MBTI는 진로 적성을 확정하는 검사가 아닙니다.
-        """
-    )
-
-    st.markdown(
-        "[서울시 공식 홈페이지](https://english.seoul.go.kr/)  \n"
-        "[한국문화관광연구원](https://www.kcti.re.kr/)  \n"
-        "[OpenStreetMap](https://www.openstreetmap.org/)"
+        f"- **{h['name']}** — {h['area']} · "
+        f"[지도·연락처·예약 정보 확인]({map_link(h['name'])})"
     )
 
 
-# =========================================================
-# 8. 하단 안내
-# =========================================================
+st.warning(
+    "호텔 요금·객실·예약 가능 여부는 날짜와 인원에 따라 달라집니다. "
+    "보호자 또는 예약 담당자와 숙박 조건을 확인하고 예약하세요."
+)
 
-st.divider()
+st.markdown("---")
 
 st.caption(
-    "© MBTI 진로 탐색 및 서울 관광 정보 교육용 앱"
+    "참고: 경복궁은 화요일 휴궁 등 관광지별 휴무·운영시간이 달라질 수 있습니다. "
+    "북촌은 주민 거주지역이므로 지정된 관람 구역과 안내 표지를 지켜 주세요. "
+    "일정은 이동·대기 시간을 고려한 추천안이며, 현장 상황에 맞춰 조정하세요."
 )
