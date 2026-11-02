@@ -1,3 +1,4 @@
+
 import streamlit as st
 import pandas as pd
 import plotly.graph_objects as go
@@ -57,29 +58,58 @@ st.markdown(
 st.divider()
 
 # ==========================================
-# 3. CSV 파일 불러오기
+# 3. CSV 데이터 불러오기
 # ==========================================
 @st.cache_data
 def load_data():
 
-    file_path = Path(__file__).parent / "countriesMBTI_16types.csv"
+    # app.py가 저장된 폴더
+    base_dir = Path(__file__).resolve().parent
 
-    if not file_path.exists():
+    # CSV 파일 검색 위치
+    possible_paths = [
+        base_dir / "countriesMBTI_16types.csv",
+        base_dir / "data" / "countriesMBTI_16types.csv",
+        Path.cwd() / "countriesMBTI_16types.csv",
+        Path.cwd() / "data" / "countriesMBTI_16types.csv"
+    ]
+
+    file_path = None
+
+    for path in possible_paths:
+        if path.is_file():
+            file_path = path
+            break
+
+    if file_path is None:
         raise FileNotFoundError(
-            "countriesMBTI_16types.csv 파일을 찾을 수 없습니다."
+            "CSV 파일을 찾을 수 없습니다.\n\n"
+            "GitHub 저장소에 다음 파일을 업로드하세요:\n"
+            "countriesMBTI_16types.csv\n\n"
+            f"현재 앱 폴더: {base_dir}"
         )
 
-    # CSV 인코딩 자동 대응
+    # CSV 인코딩 처리
     try:
-        data = pd.read_csv(file_path, encoding="utf-8-sig")
+        data = pd.read_csv(
+            file_path,
+            encoding="utf-8-sig"
+        )
     except UnicodeDecodeError:
-        data = pd.read_csv(file_path, encoding="cp949")
+        data = pd.read_csv(
+            file_path,
+            encoding="cp949"
+        )
 
+    # 컬럼명 공백 제거
     data.columns = data.columns.str.strip()
 
     if "Country" not in data.columns:
-        raise ValueError("Country 컬럼이 없습니다.")
+        raise ValueError(
+            "CSV 파일에 Country 컬럼이 없습니다."
+        )
 
+    # MBTI 16개 유형
     mbti_types = [
         "INFJ", "ISFJ", "INTP", "ISFP",
         "ENTP", "INFP", "ENTJ", "ISTP",
@@ -87,6 +117,7 @@ def load_data():
         "ESTP", "ISTJ", "ENFJ", "ESFJ"
     ]
 
+    # 누락된 컬럼 확인
     missing = [
         col for col in mbti_types
         if col not in data.columns
@@ -94,32 +125,79 @@ def load_data():
 
     if missing:
         raise ValueError(
-            f"다음 MBTI 컬럼이 없습니다: {missing}"
+            f"누락된 MBTI 컬럼: {missing}"
         )
 
+    # 숫자형 변환
     for col in mbti_types:
         data[col] = pd.to_numeric(
             data[col],
             errors="coerce"
         )
 
+    # 필수 데이터가 없는 행 제거
     data = data.dropna(
         subset=["Country"] + mbti_types
     )
 
-    return data, mbti_types
+    # 국가명 정리
+    data["Country"] = data["Country"].astype(str).str.strip()
+
+    data = data[data["Country"] != ""]
+
+    # 중복 국가 제거
+    data = data.drop_duplicates(
+        subset=["Country"],
+        keep="first"
+    )
+
+    if data.empty:
+        raise ValueError(
+            "분석할 수 있는 데이터가 없습니다."
+        )
+
+    return data, mbti_types, file_path
 
 
+# ==========================================
+# 4. 데이터 불러오기 오류 처리
+# ==========================================
 try:
-    df, mbti_types = load_data()
+    df, mbti_types, csv_path = load_data()
 
 except Exception as error:
-    st.error(f"데이터를 불러오는 중 오류가 발생했습니다: {error}")
+    st.error(
+        f"데이터를 불러오는 중 오류가 발생했습니다:\n\n{error}"
+    )
+
+    st.info("""
+    **해결 방법**
+
+    GitHub 저장소에 다음 세 파일이 있는지 확인하세요.
+
+    1. app.py
+    2. countriesMBTI_16types.csv
+    3. requirements.txt
+
+    CSV 파일은 app.py와 같은 폴더에 넣는 것을 권장합니다.
+    """)
+
     st.stop()
 
+
 # ==========================================
-# 4. 국가 선택
+# 5. 데이터 기본 정보
 # ==========================================
+st.success(
+    f"데이터 불러오기 성공! "
+    f"총 {len(df)}개 국가를 분석합니다."
+)
+
+# ==========================================
+# 6. 국가 선택
+# ==========================================
+st.divider()
+
 st.subheader("🌐 분석할 국가 선택")
 
 countries = sorted(
@@ -139,7 +217,7 @@ selected_country = st.selectbox(
 )
 
 # ==========================================
-# 5. 선택 국가 데이터 분석
+# 7. 선택한 국가 데이터 분석
 # ==========================================
 country_data = df[
     df["Country"] == selected_country
@@ -153,20 +231,20 @@ chart_data = pd.DataFrame({
     ]
 })
 
-# 비율이 높은 순서대로 정렬
+# 높은 순서대로 정렬
 chart_data = chart_data.sort_values(
     by="비율",
     ascending=False
 ).reset_index(drop=True)
 
 # ==========================================
-# 6. 그래프 색상 설정
+# 8. 그래프 색상 설정
 # ==========================================
 
-# 1위는 빨간색
+# 1위 빨간색
 first_color = "#E53935"
 
-# 2~16위는 파란색 그라데이션
+# 2~16위 파란색 그라데이션
 blue_gradient = pc.sample_colorscale(
     "Blues",
     np.linspace(0.85, 0.20, 15)
@@ -175,7 +253,7 @@ blue_gradient = pc.sample_colorscale(
 colors = [first_color] + blue_gradient
 
 # ==========================================
-# 7. 핵심 분석 결과
+# 9. 핵심 분석 결과
 # ==========================================
 first_mbti = chart_data.iloc[0]["MBTI"]
 first_rate = chart_data.iloc[0]["비율"]
@@ -191,22 +269,22 @@ col1.metric(
 )
 
 col2.metric(
-    "1위 MBTI",
+    "가장 높은 MBTI",
     first_mbti
 )
 
 col3.metric(
-    "1위 비율",
+    "최고 비율",
     f"{first_rate:.2f}%"
 )
 
 # ==========================================
-# 8. MBTI 막대그래프
+# 10. MBTI 막대그래프
 # ==========================================
 st.divider()
 
 st.subheader(
-    f"📊 {selected_country}의 MBTI 비율"
+    f"📊 {selected_country}의 MBTI 16가지 비율"
 )
 
 fig = go.Figure()
@@ -288,11 +366,11 @@ st.plotly_chart(
 )
 
 # ==========================================
-# 9. MBTI 순위표
+# 11. MBTI 순위표
 # ==========================================
 st.divider()
 
-st.subheader("🏆 MBTI 순위표")
+st.subheader("🏆 MBTI 유형별 순위")
 
 ranking = chart_data.copy()
 
@@ -313,19 +391,44 @@ st.dataframe(
 )
 
 # ==========================================
-# 10. 데이터 안내
+# 12. 전체 데이터 보기
+# ==========================================
+with st.expander("📋 전체 국가 데이터 확인"):
+
+    st.dataframe(
+        df,
+        use_container_width=True,
+        hide_index=True
+    )
+
+# ==========================================
+# 13. CSV 다운로드
+# ==========================================
+csv_download = df.to_csv(
+    index=False
+).encode("utf-8-sig")
+
+st.download_button(
+    label="📥 전체 데이터 CSV 다운로드",
+    data=csv_download,
+    file_name="world_mbti_data.csv",
+    mime="text/csv"
+)
+
+# ==========================================
+# 14. 하단 안내
 # ==========================================
 st.divider()
 
 st.caption(
-    "데이터 출처: countriesMBTI_16types.csv"
+    "자료: countriesMBTI_16types.csv"
 )
 
 st.caption(
-    "※ 비율은 원본 데이터에 100을 곱하여 표시합니다. "
+    "※ 원본 비율에 100을 곱하여 백분율로 표시합니다. "
     "원본 데이터의 국가별 비율 합계는 정확히 100%가 아닐 수 있습니다."
 )
 
 st.success(
-    f"{selected_country}의 분석이 완료되었습니다."
+    f"{selected_country}의 MBTI 분석이 완료되었습니다."
 )
