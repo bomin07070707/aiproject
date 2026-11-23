@@ -5,7 +5,10 @@ import plotly.graph_objects as go
 from sklearn.linear_model import LinearRegression
 from pathlib import Path
 
-# 페이지 설정
+# =====================================
+# 1. 페이지 설정
+# =====================================
+
 st.set_page_config(
     page_title="지역별 평균소득월액 분석",
     page_icon="📈",
@@ -13,28 +16,45 @@ st.set_page_config(
 )
 
 st.title("📈 지역별 평균소득월액 분석")
-st.caption("국민연금공단 · 2025년 12월 31일 기준")
-
-# CSV 파일 경로
-CSV_FILE = Path(__file__).parent / "국민연금공단_자격 시구신고 평균소득월액_20251231.csv"
+st.write("국민연금공단 자료를 활용한 지역별 소득 분석")
 
 
-# 데이터 불러오기
+# =====================================
+# 2. CSV 파일 경로 설정
+# =====================================
+
+# 현재 파이썬 파일은 pages 폴더에 있고
+# CSV 파일은 상위 폴더에 있음
+
+CSV_FILE = (
+    Path(__file__).resolve().parent.parent
+    / "국민연금공단_자격 시구신고 평균소득월액_20251231.csv"
+)
+
+
+# =====================================
+# 3. 데이터 불러오기
+# =====================================
+
 @st.cache_data
 def load_data():
 
     for encoding in ["cp949", "utf-8-sig", "euc-kr"]:
+
         try:
             data = pd.read_csv(
                 CSV_FILE,
                 encoding=encoding
             )
             break
+
         except UnicodeDecodeError:
             continue
-    else:
-        raise ValueError("CSV 인코딩을 확인해 주세요.")
 
+    else:
+        raise ValueError("CSV 파일의 인코딩을 확인해 주세요.")
+
+    # 필요한 열 확인
     required_columns = [
         "기준년월",
         "시군구",
@@ -48,9 +68,10 @@ def load_data():
 
     if missing:
         raise ValueError(
-            f"필요한 열이 없습니다: {missing}"
+            f"CSV 파일에 필요한 열이 없습니다: {missing}"
         )
 
+    # 데이터 정리
     data = data[required_columns].copy()
 
     data["시군구"] = (
@@ -73,31 +94,39 @@ def load_data():
     return data
 
 
-# 데이터 로딩 오류 처리
+# =====================================
+# 4. 데이터 로딩 오류 처리
+# =====================================
+
 try:
+
     df = load_data()
 
 except FileNotFoundError:
+
     st.error(
         "CSV 파일을 찾을 수 없습니다. "
-        "app.py와 CSV 파일을 같은 폴더에 넣어 주세요."
+        "CSV 파일이 상위 폴더에 있는지 확인해 주세요."
     )
+
     st.stop()
 
 except Exception as error:
-    st.error(f"데이터 오류: {error}")
+
+    st.error(f"데이터 로딩 오류: {error}")
+
     st.stop()
 
 
-# --------------------------------
-# 1. 지역 검색
-# --------------------------------
+# =====================================
+# 5. 지역 검색 기능
+# =====================================
 
-st.subheader("🔎 지역 검색")
+st.subheader("🔎 분석할 지역 검색")
 
 region_input = st.text_input(
-    "분석할 지역명을 입력하세요.",
-    placeholder="예: 서울특별시종로구 또는 해운대구"
+    "지역명을 입력하세요.",
+    placeholder="예: 서울특별시종로구, 부산광역시해운대구"
 )
 
 if region_input.strip():
@@ -111,21 +140,26 @@ if region_input.strip():
     ]
 
 else:
+
     matched = df.iloc[0:0]
 
 
+# 검색 결과가 없을 때
 if region_input.strip() and matched.empty:
 
     st.warning(
-        "일치하는 지역이 없습니다. 지역명을 다시 입력해 주세요."
+        "검색한 지역이 없습니다. "
+        "지역명을 다시 확인해 주세요."
     )
+
     st.stop()
 
 
+# 검색 결과 선택
 if not matched.empty:
 
     selected_region = st.selectbox(
-        "검색 결과에서 지역을 선택하세요.",
+        "분석할 지역을 선택하세요.",
         matched["시군구"].tolist()
     )
 
@@ -140,6 +174,7 @@ if not matched.empty:
         "평균소득월액"
     ].mean()
 
+    # 주요 통계 표시
     col1, col2, col3 = st.columns(3)
 
     col1.metric(
@@ -160,12 +195,15 @@ if not matched.empty:
     difference = selected_value - national_average
 
     if difference >= 0:
+
         st.success(
-            f"전체 평균보다 {difference:,.0f}원 높습니다."
+            f"전체 지역 평균보다 {difference:,.0f}원 높습니다."
         )
+
     else:
+
         st.info(
-            f"전체 평균보다 {abs(difference):,.0f}원 낮습니다."
+            f"전체 지역 평균보다 {abs(difference):,.0f}원 낮습니다."
         )
 
 else:
@@ -173,21 +211,23 @@ else:
     selected_region = None
 
     st.info(
-        "지역명을 입력하면 해당 지역의 소득 정보를 확인할 수 있습니다."
+        "지역명을 입력하면 해당 지역의 평균소득월액을 확인할 수 있습니다."
     )
 
 
-# --------------------------------
-# 2. 선형회귀 알고리즘
-# --------------------------------
+# =====================================
+# 6. 선형회귀 알고리즘
+# =====================================
 
 chart_df = df.copy()
 
-# 가나다순 지역 순번을 X값으로 사용
+# 가나다순 지역 순번 생성
 chart_df["지역순번"] = range(len(chart_df))
 
+# 독립변수 X
 X = chart_df[["지역순번"]]
 
+# 종속변수 Y
 y = chart_df["평균소득월액"]
 
 # 선형회귀 모델 생성
@@ -196,25 +236,27 @@ model = LinearRegression()
 # 모델 학습
 model.fit(X, y)
 
-# 추세선 예측
+# 추세선 계산
 chart_df["회귀추세선"] = model.predict(X)
 
 
-# --------------------------------
-# 3. 선그래프
-# --------------------------------
+# =====================================
+# 7. 선그래프 만들기
+# =====================================
 
 st.divider()
 
 st.subheader("📊 시군구별 평균소득월액 선그래프")
 
 st.write(
-    "가나다순으로 정렬한 지역별 평균소득월액입니다."
+    "전국 시군구별 평균소득월액과 "
+    "선형회귀 추세선을 비교합니다."
 )
 
 fig = go.Figure()
 
-# 실제 평균소득월액
+
+# 실제 데이터 선그래프
 fig.add_trace(
     go.Scatter(
         x=chart_df["시군구"],
@@ -222,9 +264,15 @@ fig.add_trace(
         mode="lines+markers",
         name="평균소득월액",
         line=dict(width=2),
-        marker=dict(size=5)
+        marker=dict(size=5),
+        hovertemplate=(
+            "%{x}<br>"
+            "평균소득월액: %{y:,.0f}원"
+            "<extra></extra>"
+        )
     )
 )
+
 
 # 선형회귀 추세선
 fig.add_trace(
@@ -236,11 +284,17 @@ fig.add_trace(
         line=dict(
             width=3,
             dash="dash"
+        ),
+        hovertemplate=(
+            "%{x}<br>"
+            "회귀 추세값: %{y:,.0f}원"
+            "<extra></extra>"
         )
     )
 )
 
-# 검색 지역 강조
+
+# 사용자가 검색한 지역 강조
 if selected_region:
 
     selected_row = chart_df[
@@ -254,15 +308,16 @@ if selected_region:
             mode="markers",
             name="검색한 지역",
             marker=dict(
-                size=15,
+                size=16,
                 symbol="star"
             )
         )
     )
 
 
+# 그래프 디자인
 fig.update_layout(
-    xaxis_title="시군구 (가나다순)",
+    xaxis_title="시군구",
     yaxis_title="평균소득월액 (원)",
     hovermode="x unified",
     legend_title="그래프 항목",
@@ -290,40 +345,62 @@ st.plotly_chart(
 )
 
 st.caption(
-    "주의: 회귀 추세선의 X축은 가나다순 지역 순번입니다. "
-    "시간에 따른 소득 변화나 미래 예측을 의미하지 않습니다."
+    "회귀 추세선은 가나다순 지역 순번을 기준으로 계산한 참고선입니다."
 )
 
 
-# --------------------------------
-# 4. 선형회귀 알고리즘 설명
-# --------------------------------
+# =====================================
+# 8. 선형회귀 알고리즘 설명
+# =====================================
 
 st.divider()
 
-st.subheader("📘 선형회귀 알고리즘이란?")
+st.subheader("📘 선형회귀 알고리즘 알아보기")
 
 st.write("""
-선형회귀는 입력값(X)과 결과값(Y) 사이의 관계를
-직선으로 나타내는 머신러닝 알고리즘입니다.
+선형회귀(Linear Regression)는 데이터를 분석하여
+입력값과 결과값 사이의 관계를 직선으로 표현하는
+대표적인 머신러닝 알고리즘입니다.
 
 데이터의 전체적인 경향을 가장 잘 설명하는
 직선을 찾아내는 것이 핵심입니다.
 """)
 
-st.markdown("### ① 작동 원리")
+
+# 작동 원리
+st.markdown("### ① 선형회귀의 작동 원리")
 
 st.markdown("""
-1. **데이터 입력:** X값과 Y값을 준비합니다.
-2. **직선 만들기:** 데이터의 경향을 설명하는 직선을 찾습니다.
-3. **오차 계산:** 실제값과 예측값의 차이를 계산합니다.
-4. **최적의 직선 찾기:** 오차 제곱의 합이 가장 작아지도록 기울기와 절편을 결정합니다.
-5. **결과 활용:** 만들어진 직선으로 데이터의 관계를 설명하거나 새로운 값을 예측합니다.
+**1단계. 데이터 입력**
+
+분석에 필요한 입력값(X)과 결과값(Y)을 준비합니다.
+
+**2단계. 직선 만들기**
+
+데이터의 전체적인 경향을 나타내는 직선을 찾습니다.
+
+**3단계. 오차 계산**
+
+실제 데이터와 직선이 예측한 값의 차이를 계산합니다.
+
+**4단계. 최적의 직선 찾기**
+
+오차 제곱의 합이 가장 작아지도록
+직선의 기울기와 절편을 결정합니다.
+
+**5단계. 결과 활용**
+
+완성된 직선을 이용하여 데이터의 관계를 설명하거나
+새로운 값을 예측할 수 있습니다.
 """)
 
+
+# 수식
 st.markdown("### ② 선형회귀 기본 수식")
 
-st.latex(r"\hat{y} = b_0 + b_1x")
+st.latex(
+    r"\hat{y} = b_0 + b_1x"
+)
 
 st.write("""
 - x : 입력값
@@ -332,29 +409,47 @@ st.write("""
 - b₁ : 직선의 기울기
 """)
 
-st.markdown("### ③ 이번 데이터에서의 활용과 한계")
 
-st.warning("""
-현재 데이터는 2025년 12월 한 시점의 지역별 평균소득월액입니다.
+# 실제 데이터 적용
+st.markdown("### ③ 이번 데이터에서의 활용")
 
-따라서 특정 지역의 과거와 미래 소득 변화를
-학습할 수 있는 시간 데이터가 아닙니다.
+st.info("""
+이번 분석에서는 다음과 같이 적용했습니다.
 
-현재 그래프의 회귀 추세선은 가나다순 지역 순번에 따른
-참고용 추세선입니다.
+- X값: 가나다순으로 정렬한 지역의 순번
+- Y값: 해당 지역의 평균소득월액
+- 알고리즘: 선형회귀(Linear Regression)
+- 결과: 전체 지역의 소득 분포에 대한 직선형 추세선
 
-미래의 소득을 예측하려면 여러 연도와 월의
-평균소득월액 데이터가 필요합니다.
+따라서 이 추세선은 지역별 소득 수준을 단순하게
+비교하기 위한 참고 자료입니다.
 """)
 
 
-# --------------------------------
-# 5. 데이터 확인
-# --------------------------------
+# 데이터 한계
+st.markdown("### ④ 선형회귀 분석의 주의점")
+
+st.warning("""
+현재 데이터는 2025년 12월 한 시점의 자료입니다.
+
+따라서 과거에서 미래로 이어지는 소득 변화는
+분석할 수 없습니다.
+
+또한 지역 순번은 실제 거리나 소득에 영향을 주는
+의미 있는 수치가 아닙니다.
+
+미래의 평균소득월액을 예측하려면
+여러 연도와 월의 데이터가 추가로 필요합니다.
+""")
+
+
+# =====================================
+# 9. 데이터 미리보기
+# =====================================
 
 st.divider()
 
-st.subheader("📋 데이터 미리보기")
+st.subheader("📋 전체 데이터 확인")
 
 st.dataframe(
     df,
@@ -363,6 +458,7 @@ st.dataframe(
 )
 
 st.caption(
-    f"분석에 사용한 지역 수: {len(df)}개"
+    f"전체 분석 지역 수: {len(df)}개"
 )
 
+st.success("지역별 평균소득월액 분석이 완료되었습니다!")
