@@ -23,8 +23,8 @@ st.write("국민연금공단 자료를 활용한 지역별 소득 분석")
 # 2. CSV 파일 경로 설정
 # =====================================
 
-# 현재 파이썬 파일은 pages 폴더에 있고
-# CSV 파일은 상위 폴더에 있음
+# app.py는 pages 폴더
+# CSV는 상위 폴더
 
 CSV_FILE = (
     Path(__file__).resolve().parent.parent
@@ -315,37 +315,43 @@ if selected_region:
     )
 
 
-# 그래프 디자인
+# 그래프 디자인 및 가로폭 확대
 fig.update_layout(
     xaxis_title="시군구",
     yaxis_title="평균소득월액 (원)",
     hovermode="x unified",
     legend_title="그래프 항목",
-    height=650,
+    height=700,
+    width=3000,
     margin=dict(
-        l=30,
-        r=30,
-        t=40,
-        b=150
+        l=50,
+        r=50,
+        t=50,
+        b=180
     )
 )
 
+# 가로축 지역명 표시 간격 조절
 fig.update_xaxes(
-    tickangle=-70,
-    tickfont=dict(size=9)
+    tickangle=-60,
+    tickfont=dict(size=10),
+    tickmode="linear",
+    dtick=5
 )
 
 fig.update_yaxes(
     tickformat=","
 )
 
+# 넓은 그래프 표시
 st.plotly_chart(
     fig,
-    use_container_width=True
+    use_container_width=False
 )
 
 st.caption(
-    "회귀 추세선은 가나다순 지역 순번을 기준으로 계산한 참고선입니다."
+    "회귀 추세선은 가나다순 지역 순번을 기준으로 계산한 참고선입니다. "
+    "시간에 따른 소득 변화나 미래 예측을 의미하지 않습니다."
 )
 
 
@@ -395,7 +401,7 @@ st.markdown("""
 """)
 
 
-# 수식
+# 선형회귀 수식
 st.markdown("### ② 선형회귀 기본 수식")
 
 st.latex(
@@ -421,12 +427,12 @@ st.info("""
 - 알고리즘: 선형회귀(Linear Regression)
 - 결과: 전체 지역의 소득 분포에 대한 직선형 추세선
 
-따라서 이 추세선은 지역별 소득 수준을 단순하게
-비교하기 위한 참고 자료입니다.
+따라서 이 추세선은 지역별 소득 수준을
+단순하게 비교하기 위한 참고 자료입니다.
 """)
 
 
-# 데이터 한계
+# 분석의 한계
 st.markdown("### ④ 선형회귀 분석의 주의점")
 
 st.warning("""
