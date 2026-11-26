@@ -114,7 +114,7 @@ df = df.dropna(
 )
 
 # =========================
-# 서울 25개 자치구 필터링
+# 서울 자치구 필터링
 # =========================
 def find_seoul_gu(region_name):
 
@@ -134,12 +134,6 @@ df = (
     ["평균소득월액"]
     .mean()
 )
-
-# 서울 25개 구 순서와 무관하게 데이터만 존재하는 구 표시
-df = df.sort_values(
-    by="평균소득월액",
-    ascending=False
-).reset_index(drop=True)
 
 if df.empty:
     st.error(
@@ -241,7 +235,7 @@ st.metric(
 )
 
 # =========================
-# 막대그래프
+# 첫 번째 막대그래프
 # =========================
 st.subheader("📊 서울 자치구별 평균소득월액")
 
@@ -270,6 +264,10 @@ fig.add_trace(
     )
 )
 
+# 세로축 범위 자동 조정
+y_min = graph_df["평균소득월액"].min() * 0.95
+y_max = graph_df["평균소득월액"].max() * 1.05
+
 fig.update_layout(
     title="서울 자치구별 평균소득월액 (높은 순)",
     height=650,
@@ -280,7 +278,8 @@ fig.update_layout(
     yaxis=dict(
         title="평균소득월액 (원)",
         tickformat=",",
-        gridcolor="lightgray"
+        gridcolor="lightgray",
+        range=[y_min, y_max]
     ),
     margin=dict(
         l=60,
@@ -316,7 +315,6 @@ algorithm = st.selectbox(
 # =========================
 model_df = graph_df.copy()
 
-# 소득 순위 부여
 model_df["순위"] = range(
     1,
     len(model_df) + 1
@@ -354,7 +352,7 @@ else:
     model_name = "랜덤포레스트"
 
 # =========================
-# 모델 결과 그래프
+# 머신러닝 결과 그래프
 # =========================
 st.subheader(f"📈 {model_name} 분석 결과")
 
@@ -397,6 +395,10 @@ model_fig.add_trace(
     )
 )
 
+# 세로축 범위 자동 조정
+model_y_min = model_df["평균소득월액"].min() * 0.95
+model_y_max = model_df["평균소득월액"].max() * 1.05
+
 model_fig.update_layout(
     title=f"서울 자치구 소득과 {model_name} 결과",
     height=650,
@@ -407,7 +409,8 @@ model_fig.update_layout(
     yaxis=dict(
         title="평균소득월액 (원)",
         tickformat=",",
-        gridcolor="lightgray"
+        gridcolor="lightgray",
+        range=[model_y_min, model_y_max]
     ),
     legend=dict(
         orientation="h",
